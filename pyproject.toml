@@ -1,0 +1,24 @@
+[project]
+name = "tech-challenge-churn-prediction"
+version = "0.1.0"
+description = "Modelo de Rede Neural para Previsão de Churn - FIAP Postech Engenharia de Machine Learning - Fase 1"
+requires-python = ">=3.11"
+dependencies = [
+    "torch>=2.0.0",          # Redes Neurais
+    "scikit-learn>=1.3.0",   # Baselines e Pipelines
+    "mlflow>=2.0.0",         # Tracking de Experimentos
+    "fastapi>=0.100.0",      # API de Inferência
+    "uvicorn>=0.22.0",       # Servidor para a API
+    "pandas>=2.0.0",         # Manipulação de Dados
+    "matplotlib>=3.7.0",     # Visualização para EDA
+    "seaborn>=0.12.0",       # Visualização para EDA
+    "pydantic>=2.0.0",       # Validação de Dados na API
+]
+
+[tool.ruff]
+# Configuração do Linter
+line-length = 88
+select = ["E", "F", "I"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

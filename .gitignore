@@ -1,0 +1,20 @@
+# Ambiente Virtual
+.venv/
+env/
+venv/
+
+# Python (Arquivos compilados e cache)
+__pycache__/
+*.py[cod]
+
+# Dados e Modelos
+data/raw/*
+data/processed/*
+models/*.joblib
+models/*.pkl
+models/*.pth
+
+# IDEs e Sistema
+.vscode/
+.idea/
+.DS_Store
