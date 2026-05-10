@@ -4,6 +4,10 @@ env/
 venv/
 
 # Python (Arquivos compilados e cache)
+# Artefatos de build e empacotamento Python
+*.egg-info/
+build/
+dist/
 __pycache__/
 *.py[cod]
 
