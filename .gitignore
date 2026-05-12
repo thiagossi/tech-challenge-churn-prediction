@@ -18,6 +18,16 @@ models/*.joblib
 models/*.pkl
 models/*.pth
 
+# MLflow Dados de Tracking e Artefatos
+mlruns/
+mlartifacts/
+
+# MLflow Arquivos de banco de dados
+mlflow.db
+mlruns*.db
+*-shm
+*-wal
+
 # IDEs e Sistema
 .vscode/
 .idea/
