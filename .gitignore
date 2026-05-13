@@ -4,6 +4,10 @@ env/
 venv/
 
 # Python (Arquivos compilados e cache)
+# Artefatos de build e empacotamento Python
+*.egg-info/
+build/
+dist/
 __pycache__/
 *.py[cod]
 
@@ -13,6 +17,16 @@ data/processed/*
 models/*.joblib
 models/*.pkl
 models/*.pth
+
+# MLflow Dados de Tracking e Artefatos
+mlruns/
+mlartifacts/
+
+# MLflow Arquivos de banco de dados
+mlflow.db
+mlruns*.db
+*-shm
+*-wal
 
 # IDEs e Sistema
 .vscode/
