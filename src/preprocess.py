@@ -27,7 +27,7 @@ def limpar_dados(df) -> pd.DataFrame:
 
     # Transforma texto em número. Espaços vazios viram NaN.
     df_clean['TotalCharges'] = pd.to_numeric(df_clean['TotalCharges'], errors='coerce')
-    # Clientes novos (tenure 0) não têm cobrança, preenchemos com 0 conforme sua EDA.
+    # Clientes novos (tenure 0) não têm cobrança, preenchemos com 0 conforme a EDA.
     df_clean['TotalCharges'] = df_clean['TotalCharges'].fillna(0)
     
     # Converte Churn para 0 e 1 se for texto
