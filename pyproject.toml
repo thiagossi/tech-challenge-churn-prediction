@@ -5,6 +5,8 @@ description = "Modelo de Rede Neural para Previsão de Churn - FIAP Postech Enge
 requires-python = ">=3.11"
 dependencies = [
     "torch>=2.0.0",          # Redes Neurais
+    "ruff>=0.1.0",           # Ruff Linting
+    "pytest>=8.0.0",         # Pytest
     "scikit-learn>=1.3.0",   # Baselines e Pipelines
     "mlflow>=2.0.0",         # Tracking de Experimentos
     "fastapi>=0.100.0",      # API de Inferência
@@ -13,13 +15,15 @@ dependencies = [
     "matplotlib>=3.7.0",     # Visualização para EDA
     "seaborn>=0.12.0",       # Visualização para EDA
     "pydantic>=2.0.0",       # Validação de Dados na API
-    "ipykernel>=6.0.0"       # Jupyter Notebook
+    "ipykernel>=6.0.0",      # Jupyter Notebook
+    "httpx>=0.24.0"          # Para TestClient do FastAPI
 ]
 
 [tool.ruff]
 # Configuração do Linter
 line-length = 88
 select = ["E", "F", "I"]
+extend-exclude = ["notebooks"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
