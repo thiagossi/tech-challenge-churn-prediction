@@ -34,8 +34,8 @@ tech-challenge-churn-prediction/
 ├── notebooks/          # Jupyter Notebooks para EDA e experimentação
 ├── src/                # Código-fonte modularizado (Scripts de treino e inferência)
 ├── tests/              # Testes unitários e de integração (Pytest)
-├── .github/workflows/  # Pipelines de CI/CD (GitHub Actions)
 ├── .gitignore          # Proteção de dados sensíveis e binários
+├── Makefile            # Facilitador de comandos
 ├── pyproject.toml      # Fonte única de verdade para dependências e linting
 └── README.md           # Instruções de uso (este arquivo)
 ```
@@ -408,7 +408,7 @@ Arquivo `model_card.md` disponível na pasta `docs/`.
 
 Documentação detalhada para demonstrar a estratégia de observabilidade do modelo de predição
 
-Arquivo `monitoring_plan.md` d pasta `docs/`.
+Arquivo `monitoring_plan.md` disponível na pasta `docs/`.
 
 ## ⚖️ Fairness
 
