@@ -4,19 +4,20 @@ version = "0.1.0"
 description = "Modelo de Rede Neural para Previsão de Churn - FIAP Postech Engenharia de Machine Learning - Fase 1"
 requires-python = ">=3.11"
 dependencies = [
-    "torch>=2.0.0",          # Redes Neurais
-    "ruff>=0.1.0",           # Ruff Linting
-    "pytest>=8.0.0",         # Pytest
-    "scikit-learn>=1.3.0",   # Baselines e Pipelines
-    "mlflow>=2.0.0",         # Tracking de Experimentos
-    "fastapi>=0.100.0",      # API de Inferência
-    "uvicorn>=0.22.0",       # Servidor para a API
-    "pandas>=2.0.0",         # Manipulação de Dados
-    "matplotlib>=3.7.0",     # Visualização para EDA
-    "seaborn>=0.12.0",       # Visualização para EDA
-    "pydantic>=2.0.0",       # Validação de Dados na API
-    "ipykernel>=6.0.0",      # Jupyter Notebook
-    "httpx>=0.24.0"          # Para TestClient do FastAPI
+    "torch>=2.0.0",             # Redes Neurais
+    "ruff>=0.1.0",              # Ruff Linting
+    "pytest>=8.0.0",            # Pytest
+    "scikit-learn>=1.3.0",      # Baselines e Pipelines
+    "mlflow>=2.0.0",            # Tracking de Experimentos
+    "fastapi>=0.100.0",         # API de Inferência
+    "uvicorn>=0.22.0",          # Servidor para a API
+    "pandas>=2.0.0",            # Manipulação de Dados
+    "matplotlib>=3.7.0",        # Visualização para EDA
+    "seaborn>=0.12.0",          # Visualização para EDA
+    "pydantic>=2.0.0",          # Validação de Dados na API
+    "ipykernel>=6.0.0",         # Jupyter Notebook
+    "httpx>=0.24.0",            # Para TestClient do FastAPI
+    "python-json-logger>=2.0.0" # Log Estruturado
 ]
 
 [tool.ruff]

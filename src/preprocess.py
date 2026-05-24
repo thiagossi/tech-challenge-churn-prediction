@@ -3,10 +3,10 @@ import os
 
 import pandas as pd
 
-# Configuração básica de logging
-logger = logging.getLogger(__name__)
+# Configuração básica de logging que está mantido na main.py
+logger = logging.getLogger("api")
 
-def carregar_dados(path: str) -> pd.DataFrame:
+def load_data(path: str) -> pd.DataFrame:
     """
     Carrega o dataset a partir de um caminho e valida sua existência.
     """
@@ -16,7 +16,7 @@ def carregar_dados(path: str) -> pd.DataFrame:
     return pd.read_csv(path)
 
 
-def limpar_dados(df) -> pd.DataFrame:
+def clean_data(df) -> pd.DataFrame:
     """
     Remove colunas irrelevantes e converte o alvo para binário.
     """
@@ -41,7 +41,7 @@ def limpar_dados(df) -> pd.DataFrame:
     logger.info("Saneamento de dados (Data Readiness) concluído.")
     return df_clean
 
-def preparar_features(df: pd.DataFrame, columns_list: list = None) -> pd.DataFrame:
+def prepare_features(df: pd.DataFrame, columns_list: list = None) -> pd.DataFrame:
     """
     Aplica One-Hot Encoding e garante que todos os dados sejam numéricos.
     """
