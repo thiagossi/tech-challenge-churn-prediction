@@ -18,6 +18,10 @@ models/*.joblib
 models/*.pkl
 models/*.pth
 
+# exceção para a pasta data
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
 # MLflow Dados de Tracking e Artefatos
 mlruns/
 mlartifacts/
