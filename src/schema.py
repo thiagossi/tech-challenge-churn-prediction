@@ -1,4 +1,3 @@
-import pandera as pa
 from pandera import Check, Column, DataFrameSchema
 
 # Schema Pandera para validação do DataFrame de entrada da API.
