@@ -1,7 +1,7 @@
-import json
 import random
 from pathlib import Path
 
+import joblib
 import mlflow
 import mlflow.pytorch
 import numpy as np
@@ -21,7 +21,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, TensorDataset
 
 from logging_config import setup_logging
-from preprocess import clean_data, load_data, prepare_features
+from preprocess import build_pipeline, clean_data, load_data
 
 # Define o nome do experimento para o MLflow
 MLFLOW_EXPERIMENT = "FIAPMobile_Churn_MLP"
@@ -35,6 +35,7 @@ DATA_PATH_PROCESSED = (
 )
 MODEL_DIR = ROOT_DIR / "models"
 MODEL_FILE = MODEL_DIR / "modelo_churn.pt"
+PIPELINE_FILE = MODEL_DIR / "pipeline.joblib"
 
 
 # FIXANDO SEEDS PARA REPRODUTIBILIDADE
@@ -83,30 +84,30 @@ def execute_training():
         mlflow.log_params(params)
 
         try:
-            # 1. Carregamento dos dados brutos
+            # 1. Carregamento e limpeza dos dados brutos
             df_raw = load_data(DATA_PATH)
-
-            # 2. Limpeza e preparação dos dados
             df_clean = clean_data(df_raw)
             df_clean.to_csv(DATA_PATH_PROCESSED, index=False)
 
-            # Preparação das features (One-Hot Encoding, Normalização, etc.)
-            X = prepare_features(df_clean)
             y = df_clean["Churn"].values
+            # X como DataFrame — necessário para o Pipeline sklearn
+            X_df = df_clean.drop(columns=["Churn"])
 
-            # Salva o contrato de colunas para garantir que a API
-            # receba o mesmo formato de dados do treinamento
-            feature_columns = X.columns.tolist()
-            with open(ROOT_DIR / "models" / "columns.json", "w") as f:
-                json.dump(feature_columns, f)
-            logger.info("✅ Contrato de colunas salvo para a API.")
-
-            # 3. DIVISÃO TREINO/TESTE
-            # Importante: Separação de dados ANTES de criar os tensores
-            # para evitar Data Leakage
-            X_train, X_test, y_train, y_test = train_test_split(
-                X.values, y, test_size=0.2, random_state=42, stratify=y
+            # 2. DIVISÃO TREINO/TESTE no DataFrame bruto (antes do encoding)
+            # Dividir antes do fit() do pipeline evita Data Leakage:
+            # o FeatureEncoder aprende as colunas SÓ do conjunto de treino.
+            X_train_df, X_test_df, y_train, y_test = train_test_split(
+                X_df, y, test_size=0.2, random_state=42, stratify=y
             )
+
+            # 3. PIPELINE SKLEARN — fit apenas no treino, transform em ambos
+            pipeline = build_pipeline()
+            X_train = pipeline.fit_transform(X_train_df)
+            X_test = pipeline.transform(X_test_df)
+
+            # Persiste o pipeline para ser carregado pela API (substitui columns.json)
+            joblib.dump(pipeline, PIPELINE_FILE)
+            logger.info(f"✅ Pipeline salvo em: {PIPELINE_FILE}")
 
             # 4. Preparação dos Tensores PyTorch
             X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
@@ -161,7 +162,8 @@ def execute_training():
 
                 if (epoch + 1) % 10 == 0:
                     logger.info(
-                        f"Época [{epoch + 1}/{params['epochs']}], Loss: {avg_train_loss:.4f}"
+                        f"Época [{epoch + 1}/{params['epochs']}], "
+                        f"Loss: {avg_train_loss:.4f}"
                     )
 
             # 6. Avaliação Final no Conjunto de Teste (Holdout)
