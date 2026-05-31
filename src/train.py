@@ -89,6 +89,24 @@ def execute_training():
             df_clean = clean_data(df_raw)
             df_clean.to_csv(DATA_PATH_PROCESSED, index=False)
 
+            # DATASET VERSION — rastreabilidade para MLFlow            
+            import hashlib
+            dataset_hash = hashlib.md5(DATA_PATH.read_bytes()).hexdigest()[:8]
+            dataset_version = f"telco_churn_{dataset_hash}"
+            mlflow.log_param("dataset_version", dataset_version)
+            mlflow.log_param("dataset_rows", len(df_raw))
+            mlflow.log_param("dataset_cols", len(df_raw.columns))
+
+            # MLflow Dataset API — registra o dataset como artefato rastreável
+            mlflow_dataset = mlflow.data.from_pandas(
+                df_clean,
+                source=str(DATA_PATH),
+                name=dataset_version,
+                targets="Churn",
+            )
+            mlflow.log_input(mlflow_dataset, context="training")
+            logger.info(f"✅ Dataset version registrada: {dataset_version}")
+
             y = df_clean["Churn"].values
             # X como DataFrame — necessário para o Pipeline sklearn
             X_df = df_clean.drop(columns=["Churn"])
