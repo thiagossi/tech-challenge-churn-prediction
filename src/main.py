@@ -56,24 +56,37 @@ app = FastAPI(
 app.add_middleware(LoggingMiddleware)
 
 
-# 3. CAMINHOS E CARREGAMENTO DE ARTEFATOS
+# 3. CAMINHOS
 ROOT_DIR = Path(__file__).resolve().parent.parent
 MODEL_PATH = ROOT_DIR / "models" / "modelo_churn.pt"
 PIPELINE_PATH = ROOT_DIR / "models" / "pipeline.joblib"
 
-# Pipeline sklearn — substitui columns.json.
-# Carrega o mesmo objeto que foi salvo pelo train.py, garantindo que
-# a transformação de inferência seja idêntica à do treino.
-pipeline = joblib.load(PIPELINE_PATH)
-INPUT_DIM = len(pipeline.named_steps["encoder"].columns_)
 
-model = ChurnMLP(input_dim=INPUT_DIM)
-if MODEL_PATH.exists():
-    model.load_state_dict(torch.load(MODEL_PATH, weights_only=True))
-    model.eval()
-    logger.info(f"✅ Modelo Champion carregado de: {MODEL_PATH}")
-else:
-    logger.error(f"❌ Modelo não encontrado em {MODEL_PATH}")
+def load_artifacts():
+    """
+    Carrega o pipeline sklearn e o modelo MLP do disco.
+
+    O pipeline garante transformação idêntica à do treino (substitui columns.json).
+    O INPUT_DIM é lido do próprio pipeline — sem hardcode.
+
+    Retorna (pipeline, model, input_dim).
+    """
+    pipeline = joblib.load(PIPELINE_PATH)
+    input_dim = len(pipeline.named_steps["encoder"].columns_)
+
+    model = ChurnMLP(input_dim=input_dim)
+    if MODEL_PATH.exists():
+        model.load_state_dict(torch.load(MODEL_PATH, weights_only=True))
+        model.eval()
+        logger.info(f"✅ Modelo Champion carregado de: {MODEL_PATH}")
+    else:
+        logger.error(f"❌ Modelo não encontrado em {MODEL_PATH}")
+
+    return pipeline, model, input_dim
+
+
+# 4. CARREGAMENTO DE ARTEFATOS (executado uma vez na startup)
+pipeline, model, INPUT_DIM = load_artifacts()
 
 
 # 4. SCHEMA PYDANTIC
@@ -99,7 +112,57 @@ class ClienteData(BaseModel):
     TotalCharges: float = Field(..., example=29.85)
 
 
-# 5. ENDPOINTS
+# 5. FUNÇÕES DE SUPORTE AO ENDPOINT
+
+def validate_input(df_input):
+    """
+    Valida o DataFrame de entrada com o schema Pandera.
+
+    Rejeita valores fora do domínio permitido (ex: gender fora de Male/Female)
+    antes de qualquer transformação, retornando 422 com detalhes do erro.
+    """
+    try:
+        input_schema.validate(df_input)
+    except SchemaError as e:
+        logger.warning(f"⚠️ Schema Pandera inválido: {e.failure_cases}")
+        raise HTTPException(
+            status_code=422,
+            detail=f"Dados de entrada inválidos: {str(e.failure_cases.to_dict())}",
+        )
+
+
+def run_inference(df_input):
+    """
+    Executa o pipeline de inferência completo:
+    DataFrame → pipeline sklearn → tensor PyTorch → modelo → resposta JSON.
+    """
+    X_processed = pipeline.transform(df_input)
+
+    if X_processed.shape[1] != INPUT_DIM:
+        logger.error(
+            f"Erro de dimensão: {X_processed.shape[1]} colunas geradas, "
+            f"esperadas {INPUT_DIM}"
+        )
+        raise HTTPException(
+            status_code=422,
+            detail="Dados de entrada geraram formato incompatível.",
+        )
+
+    input_tensor = torch.tensor(X_processed, dtype=torch.float32)
+    with torch.no_grad():
+        probabilidade = model(input_tensor).item()
+
+    predicao = 1 if probabilidade > 0.5 else 0
+    logger.info(f"🔮 Predição realizada: Prob={probabilidade:.4f} | Churn={predicao}")
+
+    return {
+        "churn_probabilidade": round(probabilidade, 4),
+        "churn_predicao": predicao,
+        "status": "sucesso",
+    }
+
+
+# 6. ENDPOINTS
 @app.get("/health")
 def health_check():
     return {"status": "healthy", "model_loaded": MODEL_PATH.exists()}
@@ -109,47 +172,8 @@ def health_check():
 def predict(cliente: ClienteData):
     try:
         df_input = pd.DataFrame([cliente.model_dump()])
-
-        # Validação Pandera — domínio dos valores        
-        try:
-            input_schema.validate(df_input)
-        except SchemaError as e:
-            logger.warning(f"⚠️ Schema Pandera inválido: {e.failure_cases}")
-            raise HTTPException(
-                status_code=422,
-                detail=f"Dados de entrada inválidos: {str(e.failure_cases.to_dict())}",
-            )
-
-        # Pipeline aplica exatamente as mesmas transformações do treino
-        X_processed = pipeline.transform(df_input)
-
-        # Validação de dimensão: garante que o pipeline gerou o shape esperado
-        if X_processed.shape[1] != INPUT_DIM:
-            logger.error(
-                f"Erro de Schema: {X_processed.shape[1]} colunas geradas, "
-                f"esperadas {INPUT_DIM}"
-            )
-            raise HTTPException(
-                status_code=422,
-                detail="Dados de entrada geraram formato incompatível.",
-            )
-
-        input_tensor = torch.tensor(X_processed, dtype=torch.float32)
-        with torch.no_grad():
-            output = model(input_tensor)
-            probabilidade = output.item()
-            predicao = 1 if probabilidade > 0.5 else 0
-
-        logger.info(
-            f"🔮 Predição realizada: Prob={probabilidade:.4f} | Churn={predicao}"
-        )
-
-        return {
-            "churn_probabilidade": round(probabilidade, 4),
-            "churn_predicao": predicao,
-            "status": "sucesso"
-        }
-
+        validate_input(df_input)
+        return run_inference(df_input)
     except HTTPException:
         raise
     except Exception as e:

@@ -1,3 +1,4 @@
+import hashlib
 import random
 from pathlib import Path
 
@@ -65,6 +66,144 @@ class ChurnMLP(nn.Module):
         return torch.sigmoid(self.fc3(x))
 
 
+def load_and_version_dataset():
+    """
+    Carrega e limpa o dataset, persiste a versão processada e
+    registra a versão + metadados no MLflow.
+
+    Retorna o DataFrame limpo pronto para split e pipeline.
+    """
+    df_raw = load_data(DATA_PATH)
+    df_clean = clean_data(df_raw)
+    df_clean.to_csv(DATA_PATH_PROCESSED, index=False)
+
+    dataset_hash = hashlib.md5(DATA_PATH.read_bytes()).hexdigest()[:8]
+    dataset_version = f"telco_churn_{dataset_hash}"
+
+    mlflow.log_param("dataset_version", dataset_version)
+    mlflow.log_param("dataset_rows", len(df_raw))
+    mlflow.log_param("dataset_cols", len(df_raw.columns))
+
+    mlflow_dataset = mlflow.data.from_pandas(
+        df_clean,
+        source=str(DATA_PATH),
+        name=dataset_version,
+        targets="Churn",
+    )
+    mlflow.log_input(mlflow_dataset, context="training")
+    logger.info(f"✅ Dataset version registrada: {dataset_version}")
+
+    return df_clean
+
+
+def prepare_splits(df_clean):
+    """
+    Divide o dataset em treino/teste, aplica o Pipeline sklearn e persiste o pipeline.
+
+    O split acontece ANTES do fit() do pipeline para evitar Data Leakage:
+    o FeatureEncoder aprende as colunas apenas com dados de treino.
+
+    Retorna X_train, X_test (numpy arrays) e y_train, y_test (arrays).
+    """
+    y = df_clean["Churn"].values
+    X_df = df_clean.drop(columns=["Churn"])
+
+    X_train_df, X_test_df, y_train, y_test = train_test_split(
+        X_df, y, test_size=0.2, random_state=42, stratify=y
+    )
+
+    pipeline = build_pipeline()
+    X_train = pipeline.fit_transform(X_train_df)
+    X_test = pipeline.transform(X_test_df)
+
+    joblib.dump(pipeline, PIPELINE_FILE)
+    logger.info(f"✅ Pipeline salvo em: {PIPELINE_FILE}")
+
+    return X_train, X_test, y_train, y_test
+
+
+def train_mlp(model, loader, params):
+    """
+    Executa o loop de treino com early stopping.
+
+    Loga a loss por época no MLflow.
+    Retorna o modelo treinado.
+    """
+    criterion = nn.BCELoss()
+    optimizer = optim.Adam(model.parameters(), lr=params["lr"])
+
+    best_loss = float("inf")
+    counter = 0
+
+    logger.info(f"🧠 Iniciando treino (Paciência: {params['early_stopping_patience']})")
+
+    for epoch in range(params["epochs"]):
+        model.train()
+        epoch_loss = 0.0
+
+        for inputs, labels in loader:
+            optimizer.zero_grad()
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+            epoch_loss += loss.item()
+
+        avg_train_loss = epoch_loss / len(loader)
+        mlflow.log_metric("train_loss", avg_train_loss, step=epoch)
+
+        if avg_train_loss < best_loss:
+            best_loss = avg_train_loss
+            counter = 0
+        else:
+            counter += 1
+
+        if counter >= params["early_stopping_patience"]:
+            logger.info(f"🛑 Parada antecipada acionada na época {epoch + 1}")
+            mlflow.set_tag("stop_reason", "early_stopping")
+            break
+
+        if (epoch + 1) % 10 == 0:
+            logger.info(
+                f"Época [{epoch + 1}/{params['epochs']}], "
+                f"Loss: {avg_train_loss:.4f}"
+            )
+
+    return model
+
+
+def evaluate_model(model, X_test_tensor, y_test):
+    """
+    Avalia o modelo no conjunto de teste e retorna as métricas.
+
+    Usa threshold 0.5 para converter probabilidade em classe binária.
+    Retorna dict com accuracy, recall, precision, f1, roc_auc e pr_auc.
+    """
+    model.eval()
+    with torch.no_grad():
+        outputs_test = model(X_test_tensor)
+        y_proba = outputs_test.numpy().flatten()
+        y_pred = (y_proba > 0.5).astype(float)
+
+    metrics = {
+        "accuracy": accuracy_score(y_test, y_pred),
+        "recall": recall_score(y_test, y_pred),
+        "precision": precision_score(y_test, y_pred, zero_division=0),
+        "f1_score": f1_score(y_test, y_pred),
+        "roc_auc": roc_auc_score(y_test, y_proba),
+        "pr_auc": average_precision_score(y_test, y_proba),
+    }
+
+    logger.info(
+        f"✅ Avaliação concluída. "
+        f"Recall={metrics['recall']:.4f} | "
+        f"AUC-ROC={metrics['roc_auc']:.4f} | "
+        f"PR-AUC={metrics['pr_auc']:.4f}"
+    )
+
+    return metrics, y_pred, y_proba
+
+
 def execute_training():
     set_seeds()
     logger.info("🚀 Iniciando Pipeline de Treinamento...")
@@ -84,127 +223,30 @@ def execute_training():
         mlflow.log_params(params)
 
         try:
-            # 1. Carregamento e limpeza dos dados brutos
-            df_raw = load_data(DATA_PATH)
-            df_clean = clean_data(df_raw)
-            df_clean.to_csv(DATA_PATH_PROCESSED, index=False)
+            # 1. Carregamento, limpeza e versionamento do dataset
+            df_clean = load_and_version_dataset()
 
-            # DATASET VERSION — rastreabilidade para MLFlow            
-            import hashlib
-            dataset_hash = hashlib.md5(DATA_PATH.read_bytes()).hexdigest()[:8]
-            dataset_version = f"telco_churn_{dataset_hash}"
-            mlflow.log_param("dataset_version", dataset_version)
-            mlflow.log_param("dataset_rows", len(df_raw))
-            mlflow.log_param("dataset_cols", len(df_raw.columns))
+            # 2. Split treino/teste + Pipeline sklearn
+            X_train, X_test, y_train, y_test = prepare_splits(df_clean)
 
-            # MLflow Dataset API — registra o dataset como artefato rastreável
-            mlflow_dataset = mlflow.data.from_pandas(
-                df_clean,
-                source=str(DATA_PATH),
-                name=dataset_version,
-                targets="Churn",
-            )
-            mlflow.log_input(mlflow_dataset, context="training")
-            logger.info(f"✅ Dataset version registrada: {dataset_version}")
-
-            y = df_clean["Churn"].values
-            # X como DataFrame — necessário para o Pipeline sklearn
-            X_df = df_clean.drop(columns=["Churn"])
-
-            # 2. DIVISÃO TREINO/TESTE no DataFrame bruto (antes do encoding)
-            # Dividir antes do fit() do pipeline evita Data Leakage:
-            # o FeatureEncoder aprende as colunas SÓ do conjunto de treino.
-            X_train_df, X_test_df, y_train, y_test = train_test_split(
-                X_df, y, test_size=0.2, random_state=42, stratify=y
-            )
-
-            # 3. PIPELINE SKLEARN — fit apenas no treino, transform em ambos
-            pipeline = build_pipeline()
-            X_train = pipeline.fit_transform(X_train_df)
-            X_test = pipeline.transform(X_test_df)
-
-            # Persiste o pipeline para ser carregado pela API (substitui columns.json)
-            joblib.dump(pipeline, PIPELINE_FILE)
-            logger.info(f"✅ Pipeline salvo em: {PIPELINE_FILE}")
-
-            # 4. Preparação dos Tensores PyTorch
+            # 3. Preparação dos Tensores PyTorch e DataLoader
             X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
             y_train_tensor = torch.tensor(y_train, dtype=torch.float32).view(-1, 1)
             X_test_tensor = torch.tensor(X_test, dtype=torch.float32)
-
-            # DataLoaders para eficiência no treino
             dataset = TensorDataset(X_train_tensor, y_train_tensor)
             loader = DataLoader(dataset, batch_size=params["batch_size"], shuffle=True)
 
-            # 5. Instanciando e Treinando o Modelo MLP
+            # 4. Treino com early stopping
             input_size = X_train.shape[1]
             model = ChurnMLP(input_dim=input_size)
-            criterion = nn.BCELoss()
-            optimizer = optim.Adam(model.parameters(), lr=params["lr"])
-
             logger.info(f"🧠 Treinando Rede Neural com {input_size} entradas...")
+            model = train_mlp(model, loader, params)
 
-            # LÓGICA DE EARLY STOPPING
-            best_loss = float("inf")
-            counter = 0
+            # 5. Avaliação no conjunto de teste (holdout)
+            metrics, y_pred, y_proba = evaluate_model(model, X_test_tensor, y_test)
 
-            logger.info(
-                f"🧠 Iniciando treino (Paciência: {params['early_stopping_patience']})"
-            )
-
-            for epoch in range(params["epochs"]):
-                model.train()
-                epoch_loss = 0.0
-
-                for inputs, labels in loader:
-                    optimizer.zero_grad()
-                    outputs = model(inputs)
-                    loss = criterion(outputs, labels)
-                    loss.backward()
-                    optimizer.step()
-                    epoch_loss += loss.item()
-
-                avg_train_loss = epoch_loss / len(loader)
-                mlflow.log_metric("train_loss", avg_train_loss, step=epoch)
-
-                if avg_train_loss < best_loss:
-                    best_loss = avg_train_loss
-                    counter = 0
-                else:
-                    counter += 1
-
-                if counter >= params["early_stopping_patience"]:
-                    logger.info(f"🛑 Parada antecipada acionada na época {epoch + 1}")
-                    mlflow.set_tag("stop_reason", "early_stopping")
-                    break
-
-                if (epoch + 1) % 10 == 0:
-                    logger.info(
-                        f"Época [{epoch + 1}/{params['epochs']}], "
-                        f"Loss: {avg_train_loss:.4f}"
-                    )
-
-            # 6. Avaliação Final no Conjunto de Teste (Holdout)
-            model.eval()
-            with torch.no_grad():
-                outputs_test = model(X_test_tensor)
-                y_proba = outputs_test.numpy().flatten()
-                y_pred = (y_proba > 0.5).astype(float)
-
-            # Cálculo de Métricas Técnicas (≥ 4 métricas — exigência do Tech Challenge)
-            metrics = {
-                "accuracy": accuracy_score(y_test, y_pred),
-                "recall": recall_score(y_test, y_pred),
-                "precision": precision_score(y_test, y_pred, zero_division=0),
-                "f1_score": f1_score(y_test, y_pred),
-                "roc_auc": roc_auc_score(y_test, y_proba),
-                "pr_auc": average_precision_score(y_test, y_proba),
-            }
-
-            # 7. REGISTRO DE GOVERNANÇA (MLflow)
+            # 6. Registro de governança no MLflow
             mlflow.log_metrics(metrics)
-
-            # Assinatura garante o contrato de dados no MLflow Model Registry
             signature = infer_signature(X_test_tensor[:1].numpy(), y_pred[:1])
             mlflow.pytorch.log_model(
                 pytorch_model=model,
@@ -212,15 +254,8 @@ def execute_training():
                 signature=signature,
             )
 
-            # 8. PERSISTÊNCIA PARA DEPLOY (Disco Local)
+            # 7. Persistência local para deploy
             torch.save(model.state_dict(), MODEL_FILE)
-
-            logger.info(
-                f"✅ Treinamento concluído. "
-                f"Recall={metrics['recall']:.4f} | "
-                f"AUC-ROC={metrics['roc_auc']:.4f} | "
-                f"PR-AUC={metrics['pr_auc']:.4f}"
-            )
             logger.info(f"📦 Modelo persistido localmente em: {MODEL_FILE}")
 
         except Exception as e:
