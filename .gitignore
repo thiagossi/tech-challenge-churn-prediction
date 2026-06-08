@@ -32,6 +32,11 @@ mlruns*.db
 *-shm
 *-wal
 
+# Testes e Coverage
+.coverage
+.pytest_cache/
+htmlcov/
+
 # IDEs e Sistema
 .vscode/
 .idea/
