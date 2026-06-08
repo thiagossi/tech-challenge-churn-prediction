@@ -174,7 +174,7 @@ O `Makefile` centraliza os comandos principais do ciclo de vida do projeto, gara
 | `make install` | Instala o projeto em modo editável e todas as dependências |
 | `make lint` | Executa a verificação de estilo e erros com o Ruff |
 | `make train` | Executa o script de treinamento do modelo Churn |
-| `make test` | Roda a suíte de testes automatizados (Smoke, Schema e API) |
+| `make test` | Roda a suíte de testes automatizados com relatório de cobertura (≥90%) |
 | `make run` | Inicia a API FastAPI (Uvicorn) em modo reload |
 
 ---
@@ -384,6 +384,12 @@ ruff check .
 
 ## 4️⃣ Testes
 
+A suíte cobre **90%** do código-fonte e está organizada em três arquivos:
+
+- `tests/test_main.py` — smoke test, validação Pydantic, validação Pandera e testes funcionais da API
+- `tests/test_preprocess.py` — testes unitários de `load_data`, `clean_data`, `DataCleaner`, `FeatureEncoder` e `build_pipeline`
+- `tests/test_train.py` — testes unitários de `ChurnMLP`, `evaluate_model`, `train_mlp`, `prepare_splits` e `load_and_version_dataset`
+
 com uso do make
 ```bash
 make test
@@ -391,7 +397,7 @@ make test
 
 Sem uso do make
 ```bash
-pytest tests/test_main.py
+pytest tests/ -v --cov=src --cov-report=term-missing
 ```
 
 ---
