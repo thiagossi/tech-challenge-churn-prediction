@@ -172,6 +172,38 @@ def train_mlp(model, loader, params):
     return model
 
 
+def evaluate_model(model, X_test_tensor, y_test):
+    """
+    Avalia o modelo no conjunto de teste e retorna as métricas.
+
+    Usa threshold 0.5 para converter probabilidade em classe binária.
+    Retorna dict com accuracy, recall, precision, f1, roc_auc e pr_auc.
+    """
+    model.eval()
+    with torch.no_grad():
+        outputs_test = model(X_test_tensor)
+        y_proba = outputs_test.numpy().flatten()
+        y_pred = (y_proba > 0.5).astype(float)
+
+    metrics = {
+        "accuracy": accuracy_score(y_test, y_pred),
+        "recall": recall_score(y_test, y_pred),
+        "precision": precision_score(y_test, y_pred, zero_division=0),
+        "f1_score": f1_score(y_test, y_pred),
+        "roc_auc": roc_auc_score(y_test, y_proba),
+        "pr_auc": average_precision_score(y_test, y_proba),
+    }
+
+    logger.info(
+        f"✅ Avaliação concluída. "
+        f"Recall={metrics['recall']:.4f} | "
+        f"AUC-ROC={metrics['roc_auc']:.4f} | "
+        f"PR-AUC={metrics['pr_auc']:.4f}"
+    )
+
+    return metrics, y_pred, y_proba
+
+
 def execute_training():
     set_seeds()
     logger.info("🚀 Iniciando Pipeline de Treinamento...")
@@ -213,21 +245,7 @@ def execute_training():
             model = train_mlp(model, loader, params)
 
             # 6. Avaliação Final no Conjunto de Teste (Holdout)
-            model.eval()
-            with torch.no_grad():
-                outputs_test = model(X_test_tensor)
-                y_proba = outputs_test.numpy().flatten()
-                y_pred = (y_proba > 0.5).astype(float)
-
-            # Cálculo de Métricas Técnicas (≥ 4 métricas — exigência do Tech Challenge)
-            metrics = {
-                "accuracy": accuracy_score(y_test, y_pred),
-                "recall": recall_score(y_test, y_pred),
-                "precision": precision_score(y_test, y_pred, zero_division=0),
-                "f1_score": f1_score(y_test, y_pred),
-                "roc_auc": roc_auc_score(y_test, y_proba),
-                "pr_auc": average_precision_score(y_test, y_proba),
-            }
+            metrics, y_pred, y_proba = evaluate_model(model, X_test_tensor, y_test)
 
             # 7. REGISTRO DE GOVERNANÇA (MLflow)
             mlflow.log_metrics(metrics)
