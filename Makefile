@@ -23,7 +23,7 @@ lint:
 	ruff check .
 
 test:
-	$(PYTHON) -m pytest $(TESTS_DIR)/test_main.py -v
+	$(PYTHON) -m pytest $(TESTS_DIR) -v --cov=src --cov-report=term-missing
 
 run:
 	$(UVICORN) src.main:app --reload

@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import pandas as pd
 import pandera as pa
 import pytest
@@ -106,3 +108,44 @@ def test_predict_functional_success():
     assert "churn_predicao" in data
     assert data["status"] == "sucesso"
     assert 0 <= data["churn_probabilidade"] <= 1
+
+
+# ---------------------------------------------------------
+# 5. PANDERA VIA API
+# Objetivo: garantir que validate_input rejeita valores
+# inválidos de domínio com 422 quando chamado via endpoint.
+# ---------------------------------------------------------
+def test_predict_pandera_rejeita_gender_invalido_via_api():
+    """gender fora do domínio deve retornar 422 via API."""
+    payload = {**PAYLOAD_VALIDO, "gender": "Outro"}
+    response = client.post("/predict", json=payload)
+    assert response.status_code == 422
+    assert "Dados de entrada inválidos" in response.json()["detail"]
+
+
+def test_predict_pandera_rejeita_contrato_invalido_via_api():
+    """Contract fora do domínio deve retornar 422 via API."""
+    payload = {**PAYLOAD_VALIDO, "Contract": "contrato_inexistente"}
+    response = client.post("/predict", json=payload)
+    assert response.status_code == 422
+
+
+# ---------------------------------------------------------
+# 6. EXCEPTION HANDLER
+# Objetivo: garantir que exceções inesperadas retornam 500.
+# ---------------------------------------------------------
+def test_predict_exception_handler_retorna_500():
+    """Exceção inesperada no pipeline deve retornar 500."""
+    with patch("src.main.run_inference", side_effect=RuntimeError("falha inesperada")):
+        response = client.post("/predict", json=PAYLOAD_VALIDO)
+    assert response.status_code == 500
+    assert "Erro interno" in response.json()["detail"]
+
+
+def test_run_inference_dimensao_errada_retorna_422():
+    """Pipeline gerando shape errado deve retornar 422."""
+    import numpy as np
+    with patch("src.main.pipeline.transform", return_value=np.zeros((1, 1))):
+        response = client.post("/predict", json=PAYLOAD_VALIDO)
+    assert response.status_code == 422
+    assert "incompatível" in response.json()["detail"]
