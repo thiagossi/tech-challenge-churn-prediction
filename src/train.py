@@ -229,28 +229,24 @@ def execute_training():
             # 2. Split treino/teste + Pipeline sklearn
             X_train, X_test, y_train, y_test = prepare_splits(df_clean)
 
-            # 4. Preparação dos Tensores PyTorch
+            # 3. Preparação dos Tensores PyTorch e DataLoader
             X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
             y_train_tensor = torch.tensor(y_train, dtype=torch.float32).view(-1, 1)
             X_test_tensor = torch.tensor(X_test, dtype=torch.float32)
-
-            # DataLoaders para eficiência no treino
             dataset = TensorDataset(X_train_tensor, y_train_tensor)
             loader = DataLoader(dataset, batch_size=params["batch_size"], shuffle=True)
 
-            # 5. Instanciando e Treinando o Modelo MLP
+            # 4. Treino com early stopping
             input_size = X_train.shape[1]
             model = ChurnMLP(input_dim=input_size)
             logger.info(f"🧠 Treinando Rede Neural com {input_size} entradas...")
             model = train_mlp(model, loader, params)
 
-            # 6. Avaliação Final no Conjunto de Teste (Holdout)
+            # 5. Avaliação no conjunto de teste (holdout)
             metrics, y_pred, y_proba = evaluate_model(model, X_test_tensor, y_test)
 
-            # 7. REGISTRO DE GOVERNANÇA (MLflow)
+            # 6. Registro de governança no MLflow
             mlflow.log_metrics(metrics)
-
-            # Assinatura garante o contrato de dados no MLflow Model Registry
             signature = infer_signature(X_test_tensor[:1].numpy(), y_pred[:1])
             mlflow.pytorch.log_model(
                 pytorch_model=model,
@@ -258,15 +254,8 @@ def execute_training():
                 signature=signature,
             )
 
-            # 8. PERSISTÊNCIA PARA DEPLOY (Disco Local)
+            # 7. Persistência local para deploy
             torch.save(model.state_dict(), MODEL_FILE)
-
-            logger.info(
-                f"✅ Treinamento concluído. "
-                f"Recall={metrics['recall']:.4f} | "
-                f"AUC-ROC={metrics['roc_auc']:.4f} | "
-                f"PR-AUC={metrics['pr_auc']:.4f}"
-            )
             logger.info(f"📦 Modelo persistido localmente em: {MODEL_FILE}")
 
         except Exception as e:
