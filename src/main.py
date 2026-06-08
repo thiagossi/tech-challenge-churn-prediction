@@ -6,10 +6,12 @@ import joblib
 import pandas as pd
 import torch
 from fastapi import FastAPI, HTTPException, Request
+from pandera.errors import SchemaError
 from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from logging_config import logger
+from src.schema import input_schema
 from src.train import ChurnMLP
 
 
@@ -108,10 +110,20 @@ def predict(cliente: ClienteData):
     try:
         df_input = pd.DataFrame([cliente.model_dump()])
 
+        # Validação Pandera — domínio dos valores        
+        try:
+            input_schema.validate(df_input)
+        except SchemaError as e:
+            logger.warning(f"⚠️ Schema Pandera inválido: {e.failure_cases}")
+            raise HTTPException(
+                status_code=422,
+                detail=f"Dados de entrada inválidos: {str(e.failure_cases.to_dict())}",
+            )
+
         # Pipeline aplica exatamente as mesmas transformações do treino
         X_processed = pipeline.transform(df_input)
 
-        # Validação de schema: garante que o pipeline gerou a dimensão esperada
+        # Validação de dimensão: garante que o pipeline gerou o shape esperado
         if X_processed.shape[1] != INPUT_DIM:
             logger.error(
                 f"Erro de Schema: {X_processed.shape[1]} colunas geradas, "
@@ -138,6 +150,8 @@ def predict(cliente: ClienteData):
             "status": "sucesso"
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"💥 Falha na inferência: {str(e)}")
         raise HTTPException(
