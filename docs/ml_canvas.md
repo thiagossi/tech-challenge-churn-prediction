@@ -24,7 +24,7 @@
 ## 5. Tarefa de Machine Learning
 *   **Tipo de Tarefa:** Classificação Binária.
 *   **Variável Alvo (Target):** Coluna `Churn`, que será convertida de categorias textuais ("Yes", "No") para valores numéricos (1 e 0), onde 1 indica a perda do cliente.
-*   **Abordagem Central:** Rede Neural MLP em **PyTorch**, comparada com baselines de **Regressão Logística** e **Dummy Classifier** (Scikit-Learn).
+*   **Abordagem Central:** Rede Neural MLP em **PyTorch**, comparada com baselines de **Regressão Logística**, **Dummy Classifier** (Scikit-Learn) e **Random Forest**.
 
 ## 6. Dados e Variáveis (Features)
 *   **Fontes de Dados:** Dataset Telco Customer Churn (IBM), contendo 7.043 registros e 21 variáveis.
