@@ -1,4 +1,5 @@
 import hashlib
+import os
 import random
 from pathlib import Path
 
@@ -24,10 +25,6 @@ from torch.utils.data import DataLoader, TensorDataset
 from logging_config import setup_logging
 from preprocess import build_pipeline, clean_data, load_data
 
-# Define o nome do experimento para o MLflow
-MLFLOW_EXPERIMENT = "FIAPMobile_Churn_MLP"
-mlflow.set_experiment(MLFLOW_EXPERIMENT)
-
 # Configuração de caminhos dinâmicos
 ROOT_DIR = Path(__file__).resolve().parent.parent
 DATA_PATH = ROOT_DIR / "data" / "raw" / "telco_customer_churn.csv"
@@ -38,6 +35,11 @@ MODEL_DIR = ROOT_DIR / "models"
 MODEL_FILE = MODEL_DIR / "modelo_churn.pt"
 PIPELINE_FILE = MODEL_DIR / "pipeline.joblib"
 
+# Define o nome do experimento para o MLflow
+MLFLOW_EXPERIMENT = "FIAPMobile_Churn_MLP"
+os.environ["MLFLOW_ARTIFACT_ROOT"] = str(ROOT_DIR / "mlruns")
+mlflow.set_tracking_uri(f"sqlite:///{ROOT_DIR}/mlruns.db")
+mlflow.set_experiment(MLFLOW_EXPERIMENT)
 
 # FIXANDO SEEDS PARA REPRODUTIBILIDADE
 def set_seeds(seed=42):
@@ -161,6 +163,7 @@ def train_mlp(model, loader, params):
         if counter >= params["early_stopping_patience"]:
             logger.info(f"🛑 Parada antecipada acionada na época {epoch + 1}")
             mlflow.set_tag("stop_reason", "early_stopping")
+            mlflow.log_param("early_stopping_epoch", epoch + 1)
             break
 
         if (epoch + 1) % 10 == 0:
@@ -247,11 +250,14 @@ def execute_training():
 
             # 6. Registro de governança no MLflow
             mlflow.log_metrics(metrics)
-            signature = infer_signature(X_test_tensor[:1].numpy(), y_pred[:1])
+            input_example = X_test_tensor[:1].numpy()
+            signature = infer_signature(input_example, y_pred[:1])
             mlflow.pytorch.log_model(
                 pytorch_model=model,
                 artifact_path="model",
                 signature=signature,
+                input_example=input_example,
+                serialization_format="pickle",
             )
 
             # 7. Persistência local para deploy
