@@ -5,7 +5,7 @@ UVICORN = uvicorn
 SRC_DIR = src
 TESTS_DIR = tests
 
-.PHONY: help install lint format test run train clean
+.PHONY: help install lint format test run train mlflow clean
 
 help:
 	@echo "Comandos disponíveis:"
@@ -14,6 +14,7 @@ help:
 	@echo "  make test     - Executa a suíte de testes automatizados"
 	@echo "  make run      - Inicia a API FastAPI localmente"
 	@echo "  make train    - Executa o script de treinamento do modelo"
+	@echo "  make mlflow   - Abre a interface do MLflow no navegador"
 	@echo "  make clean    - Remove arquivos temporários e caches"
 
 install:
@@ -30,6 +31,9 @@ run:
 
 train:
 	$(PYTHON) src/train.py
+
+mlflow:
+	$(PYTHON) run_mlflow.py
 
 clean:
 	rm -rf __pycache__ .pytest_cache .ruff_cache

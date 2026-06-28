@@ -1,1 +1,133 @@
-Ainda pendente o video STAR
+====================================================================
+ROTEIRO - VÍDEO STAR | TECH CHALLENGE FASE 1 | FIAP MLE
+Thiago Soares Simões | RM374443
+Duração estimada: ~5 minutos
+====================================================================
+
+--------------------------------------------------------------------
+[S] SITUAÇÃO (~1 minuto)
+--------------------------------------------------------------------
+
+Olá! Meu nome é Thiago e este é o Tech Challenge da Fase 1 da
+pós-graduação em Machine Learning Engineering da FIAP.
+
+O desafio proposto simula um problema real de uma operadora de
+telecomunicações — a FIAPMobile — que enfrenta uma alta taxa de
+cancelamento de clientes, o chamado "churn".
+
+Churn é, basicamente, quando um cliente deixa de usar o serviço e
+cancela o contrato. Para uma operadora, isso representa perda direta
+de receita e um custo alto de aquisição de novos clientes para
+compensar as saídas.
+
+O dataset utilizado é o Telco Customer Churn, da IBM, com mais de
+7.000 registros de clientes contendo informações demográficas, tipos
+de serviços contratados, dados de contrato e histórico financeiro.
+A taxa de churn observada nos dados é de aproximadamente 26%, o que
+já indica um desequilíbrio de classes e um desafio real para o modelo.
+
+--------------------------------------------------------------------
+[T] TAREFA (~45 segundos)
+--------------------------------------------------------------------
+
+Minha responsabilidade foi desenvolver uma solução completa de ponta
+a ponta — do dado bruto até a disponibilização em produção.
+
+Os objetivos foram:
+- Construir um modelo de classificação binária para prever quais
+  clientes têm propensão ao churn;
+- Priorizar o Recall como métrica central, pois o pior cenário para
+  o negócio é deixar de identificar um cliente que vai cancelar;
+- Seguir boas práticas de MLOps: rastreabilidade, reprodutibilidade,
+  governança, testes automatizados e API de inferência em produção.
+
+--------------------------------------------------------------------
+[A] AÇÃO (~2 minutos e 30 segundos)
+--------------------------------------------------------------------
+
+Organizei o projeto em uma estrutura profissional com separação clara
+entre código-fonte, notebooks, dados, modelos e documentação.
+
+**Pré-processamento e EDA**
+Iniciei com uma análise exploratória no Jupyter Notebook para
+entender a qualidade dos dados, correlações e distribuição das
+variáveis. Desenvolvi um pipeline de pré-processamento modular com
+duas etapas encadeadas no scikit-learn: o DataCleaner, responsável
+por tratamento de nulos e conversões de tipo, e o FeatureEncoder,
+que aplica One-Hot Encoding nas variáveis categóricas. O pipeline
+foi serializado com Joblib para garantir que a transformação em
+produção seja idêntica à do treino — eliminando o chamado
+training-serving skew.
+
+**Modelagem**
+Treinei três baselines para ter uma base de comparação: um
+DummyClassifier estratificado, Regressão Logística e Random Forest —
+todos com scikit-learn. O modelo campeão foi uma Rede Neural MLP
+desenvolvida em PyTorch, com Early Stopping na época 71. A MLP
+superou todos os baselines em Recall, que era nossa métrica
+prioritária.
+
+**Experimentos com MLflow**
+Todos os experimentos foram rastreados no MLflow, com registro de
+parâmetros, métricas e versionamento do dataset via hash MD5. Isso
+garante rastreabilidade total: sei exatamente qual versão dos dados
+gerou qual modelo.
+
+**API de Inferência em Tempo Real**
+Optei por disponibilizar o modelo via API REST com FastAPI, e não
+via batch. A justificativa de negócio é clara: quando um cliente
+entra em contato com o suporte ou solicita cancelamento, o sistema
+de CRM pode consultar o endpoint em tempo real e agir
+imediatamente com uma oferta de retenção. A API possui rota de
+health check, documentação interativa via Swagger e validação
+robusta de entrada com Pydantic e Pandera.
+
+**Qualidade e Governança**
+Implementei uma suíte de testes com cobertura de 90% do código-fonte,
+usando Pytest, com testes de schema, smoke tests e testes funcionais
+da API. O linting é feito com Ruff. A governança foi documentada em
+dois artefatos: o ML Canvas, descrevendo o problema e os requisitos,
+e o Model Card, com métricas, limitações e análise de fairness com
+Fairlearn para os atributos sensíveis de gênero e senioridade.
+
+**Automação**
+Toda a operação do projeto — instalação, treino, testes, lint e
+execução da API — é executada via Makefile, garantindo reprodução
+idêntica em qualquer ambiente.
+
+--------------------------------------------------------------------
+[R] RESULTADO (~45 segundos)
+--------------------------------------------------------------------
+
+O modelo MLP campeão atingiu as seguintes métricas no conjunto de
+teste holdout — 20% dos dados, equivalente a 1.409 registros:
+
+- Recall: 0.5936
+- AUC-ROC: 0.8405
+- PR-AUC: 0.6323
+- F1-Score: 0.6167
+- Acurácia: 80.4%
+
+Em comparação com os baselines, a MLP entregou um Recall 5,7%
+superior à Regressão Logística — o melhor baseline — o que significa
+identificar mais clientes em risco antes que eles cancelem.
+
+A solução também está pronta para produção: pipeline versionado,
+API funcional, testes passando, documentação de governança completa
+e plano de monitoramento definido para detectar data drift e
+degradação do modelo ao longo do tempo.
+
+O repositório está disponível no GitHub com toda a estrutura e
+instruções de reprodução.
+
+Obrigado!
+
+====================================================================
+FIM DO ROTEIRO
+====================================================================
+
+DICAS PARA A GRAVAÇÃO:
+- Fale em ritmo calmo — 5 minutos permite ~650 palavras por minuto
+- Tenha o projeto aberto ao fundo (VSCode ou terminal com a API rodando)
+- Se quiser mostrar algo na tela: a tabela de métricas do model_card.md
+  e o Swagger da API (/docs) são os visuais mais impactantes
