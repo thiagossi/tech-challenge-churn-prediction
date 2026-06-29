@@ -176,6 +176,7 @@ O `Makefile` centraliza os comandos principais do ciclo de vida do projeto, gara
 | `make train` | Executa o script de treinamento do modelo Churn |
 | `make test` | Roda a suíte de testes automatizados com relatório de cobertura (≥90%) |
 | `make run` | Inicia a API FastAPI (Uvicorn) em modo reload |
+| `make mlflow` | Abre a interface do MLflow UI no navegador (http://127.0.0.1:5000) |
 
 ---
 
