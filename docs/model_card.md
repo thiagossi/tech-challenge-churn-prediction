@@ -21,12 +21,12 @@ Métricas validadas no conjunto de teste holdout (20% — 1.409 registros), regi
 
 | Métrica | Valor |
 |---------|-------|
-| **Recall** | **0.5936** |
-| **AUC-ROC** | **0.8405** |
-| **PR-AUC** | **0.6323** |
-| F1-Score | **0.6167** |
+| **Recall** | **0.5856** |
+| **AUC-ROC** | **0.8416** |
+| **PR-AUC** | **0.6344** |
+| F1-Score | **0.6134** |
 | Accuracy | **0.8041** |
-| Precision | **0.6416** |
+| Precision | **0.6441** |
 
 ### Comparativo com Baselines (Holdout 20%)
 
@@ -35,13 +35,13 @@ Métricas validadas no conjunto de teste holdout (20% — 1.409 registros), regi
 | DummyClassifier (estratificado) | ~0.26 | ~0.50 | ~0.27 |
 | Regressão Logística | 0.5615 | 0.8427 | 0.6361 |
 | Random Forest | 0.4973 | 0.8253 | 0.6264 |
-| **MLP PyTorch (Champion)** | **0.5936** | **0.8405** | **0.6323** |
+| **MLP PyTorch (Champion)** | **0.5856** | **0.8416** | **0.6344** |
 
-**Conclusão:** A MLP superou todos os baselines em Recall (+5,7% vs. Regressão Logística), a métrica prioritária para o negócio — minimizar clientes que cancelam sem serem detectados.
+**Conclusão:** A MLP superou todos os baselines em Recall (+4,3% vs. Regressão Logística), a métrica prioritária para o negócio — minimizar clientes que cancelam sem serem detectados.
 
 ### Threshold de Decisão
 *   **Padrão:** 0.5 (probabilidade ≥ 0.5 → prediz churn)
-*   **Threshold ótimo de negócio:** determinado pela análise de custo FP/FN (ver notebook, célula de trade-off)
+*   **Threshold ótimo de negócio:** 0.20 — reduz o custo de churn não detectado de R$17.920 para R$12.040 (economia de 32,8%) conforme análise de custo FP/FN no notebook
 
 ## 4. Avaliação de Vieses (Fairness)
 Seguindo as normas de governança, o modelo foi auditado com **Fairlearn**:
